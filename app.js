@@ -1,24 +1,42 @@
-const express = require('express')
-const morgan = require('morgan')
+const express=require("express")
+const app=express();
+const bodyParser=require("body-parser")
+const cors=require("cors")
+const fileUpload=require("express-fileupload")
+const cookieParser=require("cookie-parser")
 const createError = require('http-errors')
 require('dotenv').config()
 require('./helpers/init_mongodb')
-const { verifyAccessToken } = require('./helpers/jwt_helper')
-require('./helpers/init_redis')
+const cloudinary = require("cloudinary").v2;
+const authRoute=require("./Routes/authRoute");
+const { verifyAccessToken } = require("./helpers/jwt_helper");
+const { authCheck, adminCheck } = require("./helpers/authHelper");
+cloudinary.config({ 
+  cloud_name: 'shahbasket', 
+  api_key: '456545845563234', 
+  api_secret: '_hlOWNSv8H2PFOtSm1p6e4ZMieE' 
+});
 
-const AuthRoute = require('./Routes/Auth.route')
+app.use(cors())
+app.use(bodyParser.json({limit: '50mb'}));
+app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
+app.use(express.json());
+app.use(cookieParser())
+app.use(fileUpload({
+    useTempFiles:true
+}))
+//routes 
+app.use("/auth",authRoute)
+app.get("/",verifyAccessToken,authCheck,adminCheck,(req,res,next)=>{
+  try {
+    res.status(200).send("hello world")
+    
+  } catch (error) {
+    next(error)
+    
+  }
 
-const app = express()
-app.use(morgan('dev'))
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
-
-app.get('/', verifyAccessToken, async (req, res, next) => {
-  res.send('Hello from express.')
 })
-
-app.use('/auth', AuthRoute)
-
 app.use(async (req, res, next) => {
   next(createError.NotFound())
 })
@@ -33,8 +51,29 @@ app.use((err, req, res, next) => {
   })
 })
 
-const PORT = process.env.PORT || 3000
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
+
+process.on("uncaughtException",err=>{
+  console.log(`Error:${err.message}`)
+  console.log(`Shuting the server due to uncaught exception`);
+  server.close(()=>{
+      process.exit(1);
+  })
+  
 })
+const server=app.listen(process.env.PORT,()=>{
+  console.log(`server running at the ${process.env.PORT}`)
+})
+
+
+//unhandle promise rejection 
+//we need to close the server asap
+process.on("unhandledRejection",err=>{
+  console.log(`Error :${err.message}`)
+  console.log(`Shuting the server due to unhandle Promise rejection`);
+  server.close(()=>{
+      process.exit(1);
+  })
+})
+
+
